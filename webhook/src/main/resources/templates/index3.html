@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook.Test - 测试和调试Webhook</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<header>
+    <div class="container">
+        <h1>Webhook.Test</h1>
+    </div>
+</header>
+
+<main class="container">
+    <div class="dashboard">
+        <!-- 侧边栏请求列表 -->
+        <div class="sidebar">
+            <div class="request-list">
+                <h2>请求列表</h2>
+                <div id="requests-container" class="requests-container">
+                    <!-- 请求列表项将通过JavaScript动态添加 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 主内容区域 -->
+        <div class="main-content">
+            <!-- 唯一URL卡片 -->
+            <div class="unique-url-card">
+                <h2>您的唯一URL</h2>
+                <p>发送请求到此URL以在下方查看详情</p>
+                <div class="url-copy-container">
+                    <input type="text" id="unique-url" readonly>
+                    <button id="copy-button">复制</button>
+                </div>
+            </div>
+
+            <!-- 请求详情 -->
+            <div id="request-details" class="request-details">
+                <div class="request-header">
+                    <div class="request-header-top">
+                        <h2>请求详情</h2>
+                        <span id="request-timestamp" class="timestamp"></span>
+                    </div>
+                    <div class="request-info">
+                        <span id="request-method" class="method"></span>
+                        <span id="request-path" class="path"></span>
+                    </div>
+                    <div id="request-ip" class="ip"></div>
+                </div>
+
+                <div class="tabs">
+                    <div class="tabs-header">
+                        <button class="tab-button active" data-tab="headers">Headers</button>
+                        <button class="tab-button" data-tab="body">Body</button>
+                        <button class="tab-button" data-tab="query">Query Params</button>
+                    </div>
+                    <div class="tab-content">
+                        <div id="headers-tab" class="tab-pane active">
+                            <pre id="headers-content"></pre>
+                        </div>
+                        <div id="body-tab" class="tab-pane">
+                            <pre id="body-content"></pre>
+                        </div>
+                        <div id="query-tab" class="tab-pane">
+                            <pre id="query-content"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- 通知弹窗 -->
+<div id="toast" class="toast">
+    <div class="toast-content">
+        <div class="toast-title">已复制到剪贴板</div>
+        <div class="toast-description">URL已成功复制到剪贴板</div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.1/dist/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let stompClient = null;
+        let uniqueUrlId = '';
+
+        // 格式化时间距离
+        function formatDistanceToNow(date) {
+            const now = new Date();
+            const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+            if (diffInSeconds < 60) {
+                return `${diffInSeconds}秒前`;
+            }
+
+            const diffInMinutes = Math.floor(diffInSeconds / 60);
+            if (diffInMinutes < 60) {
+                return `${diffInMinutes}分钟前`;
+            }
+
+            const diffInHours = Math.floor(diffInMinutes / 60);
+            if (diffInHours < 24) {
+                return `${diffInHours}小时前`;
+            }
+
+            const diffInDays = Math.floor(diffInHours / 24);
+            return `${diffInDays}天前`;
+        }
+
+        // 格式化日期
+        function formatDate(date) {
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        // 设置唯一URL
+        const uniqueUrlInput = document.getElementById('unique-url');
+        uniqueUrlInput.value = generateUniqueUrl();
+
+        // 复制URL按钮
+        const copyButton = document.getElementById('copy-button');
+        const toast = document.getElementById('toast');
+
+        copyButton.addEventListener('click', function() {
+            uniqueUrlInput.select();
+            document.execCommand('copy');
+
+            // 显示通知
+            toast.classList.add('show');
+            setTimeout(function() {
+                toast.classList.remove('show');
+            }, 3000);
+
+            // 更改按钮文本
+            const originalText = copyButton.textContent;
+            copyButton.textContent = '已复制';
+            setTimeout(function() {
+                copyButton.textContent = originalText;
+            }, 2000);
+        });
+
+        // 渲染请求列表
+        const requestsContainer = document.getElementById('requests-container');
+
+        function renderRequestList() {
+            requestsContainer.innerHTML = '';
+
+            sampleRequests.forEach(request => {
+                const requestItem = document.createElement('div');
+                requestItem.className = 'request-item';
+                requestItem.dataset.id = request.id;
+
+                const requestItemHeader = document.createElement('div');
+                requestItemHeader.className = 'request-item-header';
+
+                const methodBadge = document.createElement('span');
+                methodBadge.className = `method-badge method-${request.method.toLowerCase()}`;
+                methodBadge.textContent = request.method;
+
+                const requestTime = document.createElement('span');
+                requestTime.className = 'request-time';
+                requestTime.textContent = formatDistanceToNow(new Date(request.timestamp));
+
+                requestItemHeader.appendChild(methodBadge);
+                requestItemHeader.appendChild(requestTime);
+
+                const requestPath = document.createElement('div');
+                requestPath.className = 'request-path';
+                requestPath.textContent = request.path;
+
+                const requestIp = document.createElement('div');
+                requestIp.className = 'request-ip';
+                requestIp.textContent = `IP: ${request.ip}`;
+
+                requestItem.appendChild(requestItemHeader);
+                requestItem.appendChild(requestPath);
+                requestItem.appendChild(requestIp);
+
+                requestItem.addEventListener('click', function() {
+                    // 移除其他项目的活动状态
+                    document.querySelectorAll('.request-item').forEach(item => {
+                        item.classList.remove('active');
+                    });
+
+                    // 添加当前项目的活动状态
+                    requestItem.classList.add('active');
+
+                    // 显示请求详情
+                    showRequestDetails(request);
+                });
+
+                requestsContainer.appendChild(requestItem);
+            });
+
+            // 默认选择第一个请求
+            if (sampleRequests.length > 0) {
+                const firstItem = document.querySelector('.request-item');
+                if (firstItem) {
+                    firstItem.classList.add('active');
+                    showRequestDetails(sampleRequests[0]);
+                }
+            }
+        }
+
+        // 显示请求详情
+        function showRequestDetails(request) {
+            // 设置请求方法、路径、IP和时间戳
+            const methodElement = document.getElementById('request-method');
+            methodElement.textContent = request.method;
+            methodElement.className = `method method-${request.method.toLowerCase()}`;
+
+            document.getElementById('request-path').textContent = request.path;
+            document.getElementById('request-ip').textContent = `IP: ${request.ip}`;
+            document.getElementById('request-timestamp').textContent = formatDate(new Date(request.timestamp));
+
+            // 设置Headers内容
+            let headersContent = '';
+            for (const [key, value] of Object.entries(request.headers)) {
+                headersContent += `${key}: ${value}\n`;
+            }
+            document.getElementById('headers-content').textContent = headersContent || 'No headers';
+
+            // 设置Body内容
+            document.getElementById('body-content').textContent = request.body || 'No body content';
+
+            // 设置Query参数内容
+            let queryContent = '';
+            for (const [key, value] of Object.entries(request.query)) {
+                queryContent += `${key}: ${value}\n`;
+            }
+            document.getElementById('query-content').textContent = queryContent || 'No query parameters';
+        }
+
+        // 选项卡切换
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // 移除所有选项卡的活动状态
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabPanes.forEach(pane => pane.classList.remove('active'));
+
+                // 添加当前选项卡的活动状态
+                button.classList.add('active');
+                const tabId = button.dataset.tab;
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+
+
+        // 获取唯一的 Webhook URL
+        function fetchWebhookUrl() {
+            fetch('/webhook/generate')
+                .then(response => response.text())
+                .then(url => {
+                    uniqueUrlId = url.split('/').pop(); // 提取 URL 中的唯一部分
+                    document.getElementById('unique-url').value = url;
+                    fetchWebhookHistory(uniqueUrlId);  // 获取历史记录
+                    connectWebSocket();
+                })
+                .catch(error => {
+                    console.error('Error generating webhook URL:', error);
+                    document.getElementById('unique-url').value = 'Failed to generate URL';
+                });
+        }
+
+        // 连接 WebSocket
+        function connectWebSocket() {
+            const socket = new SockJS('/websocket');  // 连接 WebSocket
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function(frame) {
+                stompClient.subscribe('/topic/webhook/' + uniqueUrlId, function(message) {
+                    const data = JSON.parse(message.body);
+                    updateRequestList(data);  // 更新请求列表
+                });
+            });
+        }
+
+        // 更新请求列表
+        function updateRequestList(data) {
+            const requestItem = document.createElement('div');
+            requestItem.className = 'request-item';
+            requestItem.dataset.id = data.id;
+
+            const methodBadge = document.createElement('span');
+            methodBadge.className = `method-badge method-${data.method.toLowerCase()}`;
+            methodBadge.textContent = data.method;
+
+            const requestTime = document.createElement('span');
+            requestTime.className = 'request-time';
+            requestTime.textContent = new Date(data.timestamp).toLocaleString();  // 显示时间戳
+
+            requestItem.appendChild(methodBadge);
+            requestItem.appendChild(requestTime);
+
+            document.getElementById('requests-container').prepend(requestItem);
+        }
+
+        // 页面加载时自动请求生成 URL
+        window.onload = function() {
+            renderRequestList();
+            connectWebSocket();
+        };
+    });
+</script>
+</body>
+</html>
+

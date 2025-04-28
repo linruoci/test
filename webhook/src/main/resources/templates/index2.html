@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Site</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+<h1>Webhook Site</h1>
+<p><strong>Your Unique Webhook URL:</strong></p>
+<p id="webhookUrl">Loading...</p>
+
+<h2>Request History</h2>
+<table id="historyTable" border="1">
+    <thead>
+    <tr>
+        <th>Request Time</th>
+        <th>Headers</th>
+        <th>Body</th>
+    </tr>
+    </thead>
+    <tbody>
+    <!-- History records will be populated here -->
+    </tbody>
+</table>
+
+<script>
+    let stompClient = null;
+    let uniqueUrlId = '';
+
+    // 页面加载时自动请求生成 URL
+    window.onload = function() {
+        fetchWebhookUrl();
+    };
+
+    // 获取唯一的 Webhook URL
+    function fetchWebhookUrl() {
+        fetch('/webhook/generate')
+            .then(response => response.text())
+            .then(url => {
+                uniqueUrlId = url.split('/').pop(); // 提取 URL 中的唯一部分
+                document.getElementById("webhookUrl").innerText = url;
+                fetchWebhookHistory(uniqueUrlId);  // 获取历史记录
+                connectWebSocket();
+            })
+            .catch(error => {
+                console.error('Error generating webhook URL:', error);
+                document.getElementById("webhookUrl").innerText = 'Failed to generate URL';
+            });
+    }
+
+    // 获取 Webhook URL 的历史记录
+    function fetchWebhookHistory(urlId) {
+        fetch(`/webhook/${urlId}/history`)
+            .then(response => response.json())
+            .then(history => {
+                displayHistory(history);
+            })
+            .catch(error => {
+                console.error('Error fetching webhook history:', error);
+            });
+    }
+
+    // 显示请求历史记录
+    function displayHistory(history) {
+        const tableBody = document.getElementById("historyTable").getElementsByTagName('tbody')[0];
+        history.forEach(record => {
+            const row = tableBody.insertRow();
+            const timeCell = row.insertCell(0);
+            const headersCell = row.insertCell(1);
+            const bodyCell = row.insertCell(2);
+
+            timeCell.textContent = record.createdAt;  // 显示请求时间
+            headersCell.textContent = record.headers;  // 显示请求头
+            bodyCell.textContent = record.body;  // 显示请求体
+        });
+    }
+
+    // 建立 WebSocket 连接
+    function connectWebSocket() {
+        const socket = new SockJS('/websocket');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function(frame) {
+            stompClient.subscribe('/topic/webhook/' + uniqueUrlId, function(message) {
+                const data = JSON.parse(message.body);
+                displayRequestData(data);
+            });
+        });
+    }
+
+    // 显示新收到的 Webhook 请求数据
+    function displayRequestData(data) {
+        const historyTable = document.getElementById("historyTable").getElementsByTagName('tbody')[0];
+        const row = historyTable.insertRow(0);
+        const timeCell = row.insertCell(0);
+        const headersCell = row.insertCell(1);
+        const bodyCell = row.insertCell(2);
+
+        timeCell.textContent = new Date().toLocaleString();  // 显示当前时间
+        headersCell.textContent = data.headers;  // 显示请求头
+        bodyCell.textContent = data.body;  // 显示请求体
+    }
+</script>
+</body>
+</html>
