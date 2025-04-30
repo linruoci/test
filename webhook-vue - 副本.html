@@ -400,6 +400,7 @@
             background-color: #f9fafb;
             padding: 1rem;
             border-radius: 0.375rem;
+            position: relative;
         }
 
         .tab-pane.active {
@@ -514,6 +515,40 @@
             top: 50%;
             margin-top: -0.5rem;
             margin-left: -0.5rem;
+        }
+
+        /* 复制按钮样式 */
+        .copy-button {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            background-color: #e5e7eb;
+            color: #4b5563;
+            border: none;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .copy-button:hover {
+            background-color: #d1d5db;
+            color: #111827;
+        }
+
+        .copy-button.copied {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .copy-icon {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
         }
     </style>
 </head>
@@ -641,6 +676,17 @@
                                     class="tab-pane" 
                                     :class="{ active: activeTab === tab.id }"
                                 >
+                                    <!-- 添加复制按钮到body选项卡 -->
+                                    <button 
+                                        v-if="tab.id === 'body'" 
+                                        class="copy-button"
+                                        :class="{ 'copied': bodyContentCopied }"
+                                        @click="copyBodyContent"
+                                    >
+                                        <span class="copy-icon">📋</span>
+                                        {{ bodyContentCopied ? '已复制' : '复制' }}
+                                    </button>
+                                    
                                     <pre v-if="tab.id !== 'response'">{{ getTabContent(tab.id) }}</pre>
                                     <div v-else class="response-content" v-html="formattedResponse"></div>
                                 </div>
@@ -783,11 +829,14 @@ function s () {
                 const toastTitle = ref('');
                 const toastMessage = ref('');
                 const toastType = ref('success');
+                const bodyContentCopied = ref(false); // 新增：body内容复制状态
 
                 // 选项卡定义
                 const tabs = [
                     { id: 'headers', name: 'Headers' },
                     { id: 'body', name: 'Body' },
+                    { id: 'query', name: 'Query Params' },
+                    { id: 'response', name: 'Ok'  },
                     { id: 'query', name: 'Query Params' },
                     { id: 'response', name: 'Response' }
                 ];
@@ -826,7 +875,13 @@ function s () {
                 watch(selectedRequest, (newRequest) => {
                     if (newRequest) {
                         noteText.value = newRequest.note || '';
+                        bodyContentCopied.value = false; // 重置复制状态
                     }
+                });
+
+                // 监听选项卡变化
+                watch(activeTab, () => {
+                    bodyContentCopied.value = false; // 切换选项卡时重置复制状态
                 });
 
                 // 方法
@@ -874,6 +929,22 @@ function s () {
                         displayToast('已复制到剪贴板', 'URL已成功复制到剪贴板');
                         setTimeout(() => {
                             copyButtonText.value = '复制';
+                        }, 2000);
+                    }).catch(() => {
+                        displayToast('复制失败', '无法复制到剪贴板', 'error');
+                    });
+                }
+
+                // 新增：复制body内容
+                function copyBodyContent() {
+                    if (!selectedRequest.value) return;
+                    
+                    const bodyContent = selectedRequest.value.body || '';
+                    navigator.clipboard.writeText(bodyContent).then(() => {
+                        bodyContentCopied.value = true;
+                        displayToast('已复制到剪贴板', 'Body内容已成功复制到剪贴板');
+                        setTimeout(() => {
+                            bodyContentCopied.value = false;
                         }, 2000);
                     }).catch(() => {
                         displayToast('复制失败', '无法复制到剪贴板', 'error');
@@ -1059,6 +1130,7 @@ function s () {
                     toastStyle,
                     hostLinks,
                     formattedResponse,
+                    bodyContentCopied, // 新增：body内容复制状态
                     
                     formatDistanceToNow,
                     formatDate,
@@ -1067,7 +1139,8 @@ function s () {
                     addNote,
                     deleteRequest,
                     getTabContent,
-                    simulateNewRequest
+                    simulateNewRequest,
+                    copyBodyContent // 新增：复制body内容方法
                 };
             }
         }).mount('#app');
