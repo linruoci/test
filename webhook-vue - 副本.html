@@ -1,1149 +1,1226 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webhook.Test - 测试和调试Webhook</title>
-    <style>
-        /* 基础样式 */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webhook.Test - 测试和调试Webhook</title>
+<!-- 引入 highlight.js 的 CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
+<style>
+    /* 基础样式 */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            background-color: #f9fafb;
-            color: #111827;
-            line-height: 1.5;
-        }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        background-color: #f9fafb;
+        color: #111827;
+        line-height: 1.5;
+    }
 
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 1rem;
-        }
+    .container {
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
 
-        /* 头部样式 */
-        header {
-            background-color: #ffffff;
-            border-bottom: 1px solid #e5e7eb;
-            padding: 1rem 0;
-        }
+    /* 头部样式 */
+    header {
+        background-color: #ffffff;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 1rem 0;
+    }
 
-        header h1 {
-            color: #dc2626;
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
+    header h1 {
+        color: #dc2626;
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
 
-        /* 主内容区域 */
-        main {
-            padding: 1.5rem 0;
-        }
+    /* 主内容区域 */
+    main {
+        padding: 1.5rem 0;
+    }
 
+    .dashboard {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    @media (min-width: 1024px) {
         .dashboard {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1.5rem;
+            grid-template-columns: 1fr 3fr;
         }
+    }
 
-        @media (min-width: 1024px) {
-            .dashboard {
-                grid-template-columns: 1fr 3fr;
-            }
-        }
+    /* 侧边栏请求列表 */
+    .sidebar {
+        width: 100%;
+    }
 
-        /* 侧边栏请求列表 */
-        .sidebar {
-            width: 100%;
-        }
+    .request-list {
+        background-color: #ffffff;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+    }
 
-        .request-list {
-            background-color: #ffffff;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-            border: 1px solid #e5e7eb;
-            overflow: hidden;
-        }
+    .request-list h2 {
+        font-size: 1.125rem;
+        font-weight: 500;
+        padding: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
 
-        .request-list h2 {
-            font-size: 1.125rem;
-            font-weight: 500;
-            padding: 1rem;
-            border-bottom: 1px solid #e5e7eb;
-        }
+    .requests-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
 
-        .requests-container {
-            max-height: 600px;
-            overflow-y: auto;
-        }
+    .request-item {
+        padding: 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid #e5e7eb;
+        transition: background-color 0.2s;
+        position: relative; /* 为删除按钮定位做准备 */
+    }
 
-        .request-item {
-            padding: 1rem;
-            cursor: pointer;
-            border-bottom: 1px solid #e5e7eb;
-            transition: background-color 0.2s;
-            position: relative; /* 为删除按钮定位做准备 */
-        }
+    .request-item:last-child {
+        border-bottom: none;
+    }
 
-        .request-item:last-child {
-            border-bottom: none;
-        }
+    .request-item:hover {
+        background-color: #f9fafb;
+    }
 
-        .request-item:hover {
-            background-color: #f9fafb;
-        }
+    .request-item.active {
+        background-color: #f3f4f6;
+    }
 
-        .request-item.active {
-            background-color: #f3f4f6;
-        }
+    /* 删除按钮样式 */
+    .delete-button {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background-color: #ffffff;
+        border: 1px solid #e5e7eb;
+        color: #9ca3af;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0; /* 默认隐藏 */
+        transition: opacity 0.2s, background-color 0.2s, color 0.2s;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
 
-        /* 删除按钮样式 */
-        .delete-button {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background-color: #ffffff;
-            border: 1px solid #e5e7eb;
-            color: #9ca3af;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            opacity: 0; /* 默认隐藏 */
-            transition: opacity 0.2s, background-color 0.2s, color 0.2s;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-        }
+    .delete-button:hover {
+        background-color: #fee2e2;
+        color: #dc2626;
+        border-color: #fecaca;
+    }
 
-        .delete-button:hover {
-            background-color: #fee2e2;
-            color: #dc2626;
-            border-color: #fecaca;
-        }
+    .request-item:hover .delete-button {
+        opacity: 1; /* 鼠标悬停时显示 */
+    }
 
-        .request-item:hover .delete-button {
-            opacity: 1; /* 鼠标悬停时显示 */
-        }
+    .request-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 
-        .request-item-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    .method-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
 
-        .method-badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
+    .method-GET {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
 
-        .method-GET {
-            background-color: #dbeafe;
-            color: #1e40af;
-        }
+    .method-POST {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
 
-        .method-POST {
-            background-color: #d1fae5;
-            color: #065f46;
-        }
+    .method-PUT {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
 
-        .method-PUT {
-            background-color: #fef3c7;
-            color: #92400e;
-        }
+    .method-DELETE {
+        background-color: #fee2e2;
+        color: #b91c1c;
+    }
 
-        .method-DELETE {
-            background-color: #fee2e2;
-            color: #b91c1c;
-        }
+    .request-time {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
 
-        .request-time {
-            font-size: 0.75rem;
-            color: #6b7280;
-        }
+    .request-path {
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
-        .request-path {
-            margin-top: 0.5rem;
-            font-size: 0.875rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+    .request-ip {
+        margin-top: 0.25rem;
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
 
-        .request-ip {
-            margin-top: 0.25rem;
-            font-size: 0.75rem;
-            color: #6b7280;
-        }
+    /* 唯一URL卡片 */
+    .unique-url-card {
+        background-color: #ffffff;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
 
-        /* 唯一URL卡片 */
-        .unique-url-card {
-            background-color: #ffffff;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-            border: 1px solid #e5e7eb;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-        }
+    .unique-url-card h2 {
+        font-size: 1.125rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
 
-        .unique-url-card h2 {
-            font-size: 1.125rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }
+    .unique-url-card p {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-bottom: 1rem;
+    }
 
-        .unique-url-card p {
-            font-size: 0.875rem;
-            color: #6b7280;
-            margin-bottom: 1rem;
-        }
+    .url-copy-container {
+        display: flex;
+    }
 
-        .url-copy-container {
-            display: flex;
-        }
+    .url-copy-container input {
+        flex: 1;
+        padding: 0.75rem;
+        background-color: #f9fafb;
+        border: 1px solid #d1d5db;
+        border-right: none;
+        border-top-left-radius: 0.375rem;
+        border-bottom-left-radius: 0.375rem;
+        font-family: monospace;
+        font-size: 0.875rem;
+    }
 
-        .url-copy-container input {
-            flex: 1;
-            padding: 0.75rem;
-            background-color: #f9fafb;
-            border: 1px solid #d1d5db;
-            border-right: none;
-            border-top-left-radius: 0.375rem;
-            border-bottom-left-radius: 0.375rem;
-            font-family: monospace;
-            font-size: 0.875rem;
-        }
+    .url-copy-container button {
+        padding: 0.75rem 1rem;
+        background-color: #2563eb;
+        color: #ffffff;
+        border: none;
+        border-top-right-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
 
-        .url-copy-container button {
-            padding: 0.75rem 1rem;
-            background-color: #2563eb;
-            color: #ffffff;
-            border: none;
-            border-top-right-radius: 0.375rem;
-            border-bottom-right-radius: 0.375rem;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
+    .url-copy-container button:hover {
+        background-color: #1d4ed8;
+    }
 
-        .url-copy-container button:hover {
-            background-color: #1d4ed8;
-        }
+    /* 请求详情 */
+    .request-details {
+        background-color: #ffffff;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+    }
 
-        /* 请求详情 */
-        .request-details {
-            background-color: #ffffff;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-            border: 1px solid #e5e7eb;
-            overflow: hidden;
-        }
+    .request-header {
+        padding: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
 
-        .request-header {
-            padding: 1rem;
-            border-bottom: 1px solid #e5e7eb;
-        }
+    .request-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
 
-        .request-header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-        }
+    .request-header h2 {
+        font-size: 1.125rem;
+        font-weight: 500;
+    }
 
-        .request-header h2 {
-            font-size: 1.125rem;
-            font-weight: 500;
-        }
+    .timestamp {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
 
-        .timestamp {
-            font-size: 0.875rem;
-            color: #6b7280;
-        }
+    .request-info {
+        display: flex;
+        align-items: center;
+        margin-top: 0.5rem;
+    }
 
-        .request-info {
-            display: flex;
-            align-items: center;
-            margin-top: 0.5rem;
-        }
+    .method {
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-right: 0.5rem;
+    }
 
-        .method {
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-right: 0.5rem;
-        }
+    .path {
+        font-size: 0.875rem;
+        font-family: monospace;
+    }
 
-        .path {
-            font-size: 0.875rem;
-            font-family: monospace;
-        }
+    .ip {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+    }
 
-        .ip {
-            font-size: 0.75rem;
-            color: #6b7280;
-            margin-top: 0.25rem;
-        }
+    /* 增强的请求详情 */
+    .request-meta {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        font-size: 0.875rem;
+    }
 
-        /* 增强的请求详情 */
+    @media (min-width: 768px) {
         .request-meta {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 0.5rem;
-            margin-top: 1rem;
-            font-size: 0.875rem;
+            grid-template-columns: 1fr 1fr;
         }
+    }
 
-        @media (min-width: 768px) {
-            .request-meta {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
+    .meta-item {
+        display: flex;
+        border-bottom: 1px solid #f3f4f6;
+        padding-bottom: 0.5rem;
+    }
 
-        .meta-item {
-            display: flex;
-            border-bottom: 1px solid #f3f4f6;
-            padding-bottom: 0.5rem;
-        }
+    .meta-label {
+        width: 100px;
+        font-weight: 500;
+        color: #4b5563;
+    }
 
-        .meta-label {
-            width: 100px;
-            font-weight: 500;
-            color: #4b5563;
-        }
+    .meta-value {
+        flex: 1;
+        word-break: break-all;
+    }
 
-        .meta-value {
-            flex: 1;
-            word-break: break-all;
-        }
+    .meta-value a {
+        color: #2563eb;
+        text-decoration: none;
+        margin-right: 0.5rem;
+    }
 
-        .meta-value a {
-            color: #2563eb;
-            text-decoration: none;
-            margin-right: 0.5rem;
-        }
+    .meta-value a:hover {
+        text-decoration: underline;
+    }
 
-        .meta-value a:hover {
-            text-decoration: underline;
-        }
+    .note-container {
+        display: flex;
+        align-items: center;
+        margin-top: 0.5rem;
+    }
 
-        .note-container {
-            display: flex;
-            align-items: center;
-            margin-top: 0.5rem;
-        }
+    .note-input {
+        flex: 1;
+        padding: 0.5rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        margin-right: 0.5rem;
+        font-size: 0.875rem;
+    }
 
-        .note-input {
-            flex: 1;
-            padding: 0.5rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.375rem;
-            margin-right: 0.5rem;
-            font-size: 0.875rem;
-        }
+    .note-button {
+        padding: 0.5rem 1rem;
+        background-color: #2563eb;
+        color: #ffffff;
+        border: none;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
 
-        .note-button {
-            padding: 0.5rem 1rem;
-            background-color: #2563eb;
-            color: #ffffff;
-            border: none;
-            border-radius: 0.375rem;
-            cursor: pointer;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
+    /* 选项卡 */
+    .tabs {
+        padding: 1rem;
+    }
 
-        /* 选项卡 */
-        .tabs {
-            padding: 1rem;
-        }
+    .tabs-header {
+        display: flex;
+        border-bottom: 1px solid #e5e7eb;
+        flex-wrap: wrap;
+    }
 
-        .tabs-header {
-            display: flex;
-            border-bottom: 1px solid #e5e7eb;
-            flex-wrap: wrap;
-        }
+    .tab-button {
+        padding: 0.5rem 1rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.875rem;
+        color: #6b7280;
+        border-bottom: 2px solid transparent;
+    }
 
-        .tab-button {
-            padding: 0.5rem 1rem;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 0.875rem;
-            color: #6b7280;
-            border-bottom: 2px solid transparent;
-        }
+    .tab-button:hover {
+        color: #111827;
+    }
 
-        .tab-button:hover {
-            color: #111827;
-        }
+    .tab-button.active {
+        color: #2563eb;
+        border-bottom-color: #2563eb;
+    }
 
-        .tab-button.active {
-            color: #2563eb;
-            border-bottom-color: #2563eb;
-        }
+    .tab-content {
+        margin-top: 1rem;
+    }
 
-        .tab-content {
-            margin-top: 1rem;
-        }
+    .tab-pane {
+        display: none;
+        background-color: #f9fafb;
+        padding: 1rem;
+        border-radius: 0.375rem;
+        position: relative;
+    }
 
-        .tab-pane {
-            display: none;
-            background-color: #f9fafb;
-            padding: 1rem;
-            border-radius: 0.375rem;
-            position: relative;
-        }
+    .tab-pane.active {
+        display: block;
+    }
 
-        .tab-pane.active {
-            display: block;
-        }
+    .tab-pane pre {
+        font-family: monospace;
+        font-size: 0.875rem;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
 
-        .tab-pane pre {
-            font-family: monospace;
-            font-size: 0.875rem;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
+    /* 响应内容 */
+    .response-content {
+        background-color: #f9fafb;
+        padding: 1rem;
+        border-radius: 0.375rem;
+        margin-top: 1rem;
+        font-family: monospace;
+        font-size: 0.875rem;
+        white-space: pre-wrap;
+        word-break: break-all;
+        line-height: 1.6;
+        color: #374151;
+        border: 1px solid #e5e7eb;
+        max-height: 300px;
+        overflow-y: auto;
+    }
 
-        /* 响应内容 */
-        .response-content {
-            background-color: #f9fafb;
-            padding: 1rem;
-            border-radius: 0.375rem;
-            margin-top: 1rem;
-            font-family: monospace;
-            font-size: 0.875rem;
-            white-space: pre-wrap;
-            word-break: break-all;
-            line-height: 1.6;
-            color: #374151;
-            border: 1px solid #e5e7eb;
-            max-height: 300px;
-            overflow-y: auto;
-        }
+    .response-content .code-line {
+        display: block;
+        color: #4b5563;
+    }
 
-        .response-content .code-line {
-            display: block;
-            color: #4b5563;
-        }
+    /* 通知弹窗 */
+    .toast {
+        position: fixed;
+        bottom: 1rem;
+        right: 1rem;
+        background-color: #ffffff;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        padding: 1rem;
+        max-width: 350px;
+        transform: translateY(150%);
+        transition: transform 0.3s ease-in-out;
+        z-index: 1000;
+    }
 
-        /* 通知弹窗 */
-        .toast {
-            position: fixed;
-            bottom: 1rem;
-            right: 1rem;
-            background-color: #ffffff;
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            padding: 1rem;
-            max-width: 350px;
-            transform: translateY(150%);
-            transition: transform 0.3s ease-in-out;
-            z-index: 1000;
-        }
+    .toast.show {
+        transform: translateY(0);
+    }
 
-        .toast.show {
-            transform: translateY(0);
-        }
+    .toast-title {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
 
-        .toast-title {
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
+    .toast-description {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
 
-        .toast-description {
-            font-size: 0.875rem;
-            color: #6b7280;
-        }
+    /* 测试按钮 */
+    .test-button-container {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 1rem;
+    }
+    
+    .test-button {
+        padding: 0.75rem 1rem;
+        background-color: #10b981;
+        color: #ffffff;
+        border: none;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+    
+    .test-button:hover {
+        background-color: #059669;
+    }
 
-        /* 测试按钮 */
-        .test-button-container {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 1rem;
-        }
-        
-        .test-button {
-            padding: 0.75rem 1rem;
-            background-color: #10b981;
-            color: #ffffff;
-            border: none;
-            border-radius: 0.375rem;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-        
-        .test-button:hover {
-            background-color: #059669;
-        }
+    /* 加载状态 */
+    .loading {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #ffffff;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 0.5rem;
+    }
 
-        /* 加载状态 */
-        .loading {
-            display: inline-block;
-            width: 1rem;
-            height: 1rem;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: #ffffff;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 0.5rem;
-        }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+    .button-loading {
+        position: relative;
+        pointer-events: none;
+        opacity: 0.7;
+    }
 
-        .button-loading {
-            position: relative;
-            pointer-events: none;
-            opacity: 0.7;
-        }
+    .button-loading .loading {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        margin-top: -0.5rem;
+        margin-left: -0.5rem;
+    }
 
-        .button-loading .loading {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            margin-top: -0.5rem;
-            margin-left: -0.5rem;
-        }
+    /* 复制按钮样式 */
+    .copy-button {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        background-color: #e5e7eb;
+        color: #4b5563;
+        border: none;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: background-color 0.2s, color 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        z-index: 10;
+    }
 
-        /* 复制按钮样式 */
-        .copy-button {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            padding: 0.25rem 0.5rem;
-            background-color: #e5e7eb;
-            color: #4b5563;
-            border: none;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: background-color 0.2s, color 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
+    .copy-button:hover {
+        background-color: #d1d5db;
+        color: #111827;
+    }
 
-        .copy-button:hover {
-            background-color: #d1d5db;
-            color: #111827;
-        }
+    .copy-button.copied {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
 
-        .copy-button.copied {
-            background-color: #d1fae5;
-            color: #065f46;
-        }
+    .copy-icon {
+        width: 14px;
+        height: 14px;
+        display: inline-block;
+    }
 
-        .copy-icon {
-            width: 14px;
-            height: 14px;
-            display: inline-block;
-        }
-    </style>
+    /* highlight.js 自定义样式 */
+    .hljs {
+        background: #f9fafb !important;
+        padding: 0 !important;
+        border-radius: 0.375rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
 </head>
 <body>
-    <div id="app">
-        <header>
-            <div class="container">
-                <h1>Webhook.Test</h1>
-            </div>
-        </header>
+<div id="app">
+    <header>
+        <div class="container">
+            <h1>Webhook.Test</h1>
+        </div>
+    </header>
 
-        <main class="container">
-            <div class="dashboard">
-                <!-- 侧边栏请求列表 -->
-                <div class="sidebar">
-                    <div class="request-list">
-                        <h2>请求列表</h2>
-                        <div class="requests-container">
-                            <div 
-                                v-for="request in requests" 
-                                :key="request.id" 
-                                class="request-item" 
-                                :class="{ active: selectedRequestId === request.id }"
-                                @click="selectRequest(request.id)"
-                            >
-                                <div class="request-item-header">
-                                    <span :class="['method-badge', `method-${request.method}`]">{{ request.method }}</span>
-                                    <span class="request-time">{{ formatDistanceToNow(new Date(request.timestamp)) }}</span>
-                                </div>
-                                <div class="request-path">{{ request.path }}</div>
-                                <div class="request-ip">IP: {{ request.ip }}</div>
-                                <button 
-                                    class="delete-button" 
-                                    aria-label="删除请求" 
-                                    @click.stop="deleteRequest(request.id)"
-                                >×</button>
+    <main class="container">
+        <div class="dashboard">
+            <!-- 侧边栏请求列表 -->
+            <div class="sidebar">
+                <div class="request-list">
+                    <h2>请求列表</h2>
+                    <div class="requests-container">
+                        <div 
+                            v-for="request in requests" 
+                            :key="request.id" 
+                            class="request-item" 
+                            :class="{ active: selectedRequestId === request.id }"
+                            @click="selectRequest(request.id)"
+                        >
+                            <div class="request-item-header">
+                                <span :class="['method-badge', `method-${request.method}`]">{{ request.method }}</span>
+                                <span class="request-time">{{ formatDistanceToNow(new Date(request.timestamp)) }}</span>
                             </div>
+                            <div class="request-path">{{ request.path }}</div>
+                            <div class="request-ip">IP: {{ request.ip }}</div>
+                            <button 
+                                class="delete-button" 
+                                aria-label="删除请求" 
+                                @click.stop="deleteRequest(request.id)"
+                            >×</button>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- 主内容区域 -->
-                <div class="main-content">
-                    <!-- 唯一URL卡片 -->
-                    <div class="unique-url-card">
-                        <h2>您的唯一URL</h2>
-                        <p>发送请求到此URL以在下方查看详情</p>
-                        <div class="url-copy-container">
-                            <input type="text" v-model="uniqueUrl" readonly>
-                            <button @click="copyUrl">{{ copyButtonText }}</button>
-                        </div>
-                        <div class="test-button-container">
-                            <button class="test-button" @click="simulateNewRequest">模拟接收新请求</button>
-                        </div>
+            <!-- 主内容区域 -->
+            <div class="main-content">
+                <!-- 唯一URL卡片 -->
+                <div class="unique-url-card">
+                    <h2>您的唯一URL</h2>
+                    <p>发送请求到此URL以在下方查看详情</p>
+                    <div class="url-copy-container">
+                        <input type="text" v-model="uniqueUrl" readonly>
+                        <button @click="copyUrl">{{ copyButtonText }}</button>
                     </div>
+                    <div class="test-button-container">
+                        <button class="test-button" @click="simulateNewRequest">模拟接收新请求</button>
+                    </div>
+                </div>
 
-                    <!-- 请求详情 -->
-                    <div v-if="selectedRequest" class="request-details">
-                        <div class="request-header">
-                            <div class="request-header-top">
-                                <h2>请求详情</h2>
-                                <span class="timestamp">{{ formatDate(new Date(selectedRequest.timestamp)) }}</span>
+                <!-- 请求详情 -->
+                <div v-if="selectedRequest" class="request-details">
+                    <div class="request-header">
+                        <div class="request-header-top">
+                            <h2>请求详情</h2>
+                            <span class="timestamp">{{ formatDate(new Date(selectedRequest.timestamp)) }}</span>
+                        </div>
+                        <div class="request-info">
+                            <span :class="['method', `method-${selectedRequest.method}`]">{{ selectedRequest.method }}</span>
+                            <span class="path">{{ selectedRequest.fullUrl }}</span>
+                        </div>
+                        
+                        <!-- 增强的请求元数据 -->
+                        <div class="request-meta">
+                            <div class="meta-item">
+                                <div class="meta-label">Host</div>
+                                <div class="meta-value" v-html="hostLinks"></div>
                             </div>
-                            <div class="request-info">
-                                <span :class="['method', `method-${selectedRequest.method}`]">{{ selectedRequest.method }}</span>
-                                <span class="path">{{ selectedRequest.fullUrl }}</span>
+                            <div class="meta-item">
+                                <div class="meta-label">Date</div>
+                                <div class="meta-value">{{ formatDate(new Date(selectedRequest.timestamp)) }} ({{ formatDistanceToNow(new Date(selectedRequest.timestamp)) }})</div>
                             </div>
-                            
-                            <!-- 增强的请求元数据 -->
-                            <div class="request-meta">
-                                <div class="meta-item">
-                                    <div class="meta-label">Host</div>
-                                    <div class="meta-value" v-html="hostLinks"></div>
-                                </div>
-                                <div class="meta-item">
-                                    <div class="meta-label">Date</div>
-                                    <div class="meta-value">{{ formatDate(new Date(selectedRequest.timestamp)) }} ({{ formatDistanceToNow(new Date(selectedRequest.timestamp)) }})</div>
-                                </div>
-                                <div class="meta-item">
-                                    <div class="meta-label">Size</div>
-                                    <div class="meta-value">{{ selectedRequest.size }}</div>
-                                </div>
-                                <div class="meta-item">
-                                    <div class="meta-label">Time</div>
-                                    <div class="meta-value">{{ selectedRequest.processingTime }}</div>
-                                </div>
-                                <div class="meta-item">
-                                    <div class="meta-label">ID</div>
-                                    <div class="meta-value">{{ selectedRequest.id }}</div>
-                                </div>
-                                <div class="meta-item">
-                                    <div class="meta-label">Note</div>
-                                    <div class="meta-value">
-                                        <div class="note-container">
-                                            <input type="text" v-model="noteText" class="note-input" placeholder="添加备注...">
-                                            <button 
-                                                class="note-button" 
-                                                :class="{ 'button-loading': isAddingNote }" 
-                                                @click="addNote" 
-                                                :disabled="isAddingNote"
-                                            >
-                                                <span v-if="isAddingNote" class="loading"></span>
-                                                <span v-else>添加</span>
-                                            </button>
-                                        </div>
+                            <div class="meta-item">
+                                <div class="meta-label">Size</div>
+                                <div class="meta-value">{{ selectedRequest.size }}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-label">Time</div>
+                                <div class="meta-value">{{ selectedRequest.processingTime }}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-label">ID</div>
+                                <div class="meta-value">{{ selectedRequest.id }}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-label">Note</div>
+                                <div class="meta-value">
+                                    <div class="note-container">
+                                        <input type="text" v-model="noteText" class="note-input" placeholder="添加备注...">
+                                        <button 
+                                            class="note-button" 
+                                            :class="{ 'button-loading': isAddingNote }" 
+                                            @click="addNote" 
+                                            :disabled="isAddingNote"
+                                        >
+                                            <span v-if="isAddingNote" class="loading"></span>
+                                            <span v-else>添加</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="tabs">
-                            <div class="tabs-header">
-                                <button 
-                                    v-for="tab in tabs" 
-                                    :key="tab.id" 
-                                    class="tab-button" 
-                                    :class="{ active: activeTab === tab.id }"
-                                    @click="activeTab = tab.id"
-                                >{{ tab.name }}</button>
-                            </div>
-                            <div class="tab-content">
-                                <div 
-                                    v-for="tab in tabs" 
-                                    :key="tab.id" 
-                                    class="tab-pane" 
-                                    :class="{ active: activeTab === tab.id }"
-                                >
-                                    <!-- 添加复制按钮到body选项卡 -->
-                                    <button 
-                                        v-if="tab.id === 'body'" 
-                                        class="copy-button"
-                                        :class="{ 'copied': bodyContentCopied }"
-                                        @click="copyBodyContent"
-                                    >
-                                        <span class="copy-icon">📋</span>
-                                        {{ bodyContentCopied ? '已复制' : '复制' }}
-                                    </button>
-                                    
-                                    <pre v-if="tab.id !== 'response'">{{ getTabContent(tab.id) }}</pre>
-                                    <div v-else class="response-content" v-html="formattedResponse"></div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
-                    <div v-else class="request-details">
-                        <div class="request-header">
-                            <h2>请求详情</h2>
-                            <p class="text-gray-500 mt-4">选择一个请求查看详情</p>
+
+                    <div class="tabs">
+                        <div class="tabs-header">
+                            <button 
+                                v-for="tab in tabs" 
+                                :key="tab.id" 
+                                class="tab-button" 
+                                :class="{ active: activeTab === tab.id }"
+                                @click="activeTab = tab.id"
+                            >{{ tab.name }}</button>
+                        </div>
+                        <div class="tab-content">
+                            <div 
+                                v-for="tab in tabs" 
+                                :key="tab.id" 
+                                class="tab-pane" 
+                                :class="{ active: activeTab === tab.id }"
+                            >
+                                <!-- 添加复制按钮到body选项卡 -->
+                                <button 
+                                    v-if="tab.id === 'body'" 
+                                    class="copy-button"
+                                    :class="{ 'copied': bodyContentCopied }"
+                                    @click="copyBodyContent"
+                                >
+                                    <span class="copy-icon">📋</span>
+                                    {{ bodyContentCopied ? '已复制' : '复制' }}
+                                </button>
+                                
+                                <!-- 使用highlight.js高亮显示JSON -->
+                                <div v-if="tab.id === 'body' && isJsonBody" ref="jsonViewer"></div>
+                                <pre v-else-if="tab.id !== 'response'">{{ getTabContent(tab.id) }}</pre>
+                                <div v-else class="response-content" v-html="formattedResponse"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </main>
-
-        <!-- 通知弹窗 -->
-        <div class="toast" :class="{ show: showToast }" :style="toastStyle">
-            <div class="toast-content">
-                <div class="toast-title">{{ toastTitle }}</div>
-                <div class="toast-description">{{ toastMessage }}</div>
+                <div v-else class="request-details">
+                    <div class="request-header">
+                        <h2>请求详情</h2>
+                        <p class="text-gray-500 mt-4">选择一个请求查看详情</p>
+                    </div>
+                </div>
             </div>
         </div>
+    </main>
+
+    <!-- 通知弹窗 -->
+    <div class="toast" :class="{ show: showToast }" :style="toastStyle">
+        <div class="toast-content">
+            <div class="toast-title">{{ toastTitle }}</div>
+            <div class="toast-description">{{ toastMessage }}</div>
+        </div>
     </div>
+</div>
 
-    <script type="module">
-        import { createApp, ref, computed, watch } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
+<!-- 引入 highlight.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<!-- 引入 JSON 语言包 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/json.min.js"></script>
 
-        createApp({
-            setup() {
-                // API 基础URL
-                const API_BASE_URL = 'https://api.webhook.test';
-                
-                // 示例请求数据
-                const requests = ref([
-                    {
-                        id: '540e3074-fba4-42d2-af0c-9067b9c2fce0',
-                        method: 'GET',
-                        path: '/webhook/540e3074-fba4-42d2-af0c-9067b9c2fce0',
-                        fullUrl: 'https://webhook.test/webhook/540e3074-fba4-42d2-af0c-9067b9c2fce0',
-                        timestamp: new Date().toISOString(),
-                        ip: '155.133.7.50',
-                        host: 'webhook.test',
-                        size: '0 bytes',
-                        processingTime: '0.000 sec',
-                        note: '',
-                        headers: {
-                            'accept-language': 'zh-CN,zh;q=0.9',
-                            'accept-encoding': 'gzip, deflate, br, zstd',
-                            'sec-fetch-dest': 'document',
-                            'sec-fetch-user': '?1',
-                            'sec-fetch-mode': 'navigate',
-                            'sec-fetch-site': 'none',
-                            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                            'purpose': 'prefetch',
-                            'sec-purpose': 'prefetch;prerender',
-                            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-                            'upgrade-insecure-requests': '1',
-                            'sec-ch-ua-platform': '"Windows"',
-                            'sec-ch-ua-mobile': '?0',
-                            'sec-ch-ua': '"Google Chrome";v="135", "Not-A.Brand";v="8", "Chromium";v="135"',
-                            'host': 'webhook.site'
-                        },
-                        body: '',
-                        query: {},
-                        response: `This URL has no default content configured. = o.reach);
-        A += w.value.length, w = w.next
-    ) {
-        var E = w.value
-        if (n.length > e.length) return
-        if (!(E instanceof i)) {
-            var P,
-                L = 1
-            if (v) {
-                if (!(P = l(b, A, e, m)) || P.index >= e.length) break
-                var S = P.index,
-                    Q = P.index + P[0].length,
-                    j = A
-                for (j += w.value.length; S >= j; ) w.value instanceof i)) continue
-                for (var C = w; C !== n.tail && (j < Q || 'string' == typeof C.value); C = C.next)
-                    L++, (j += C.value.length)
-                L--, (j -= C.value.length), (E = e.slice(A, j)), (P.index -= A)
-            } else if (!(P = l(b, 0, E, m))) continue
-            S = P.index
-            var N = P[0],
-                _ = E.slice(0, S),
-                M = E.slice(S + N.length),
-                W = A + E.length
-            g && W > g.reach && (g.reach = W)
-            var z = w.prev
-            if (
-                (_ && ((z = c(n, z, _)), (A += _.length)),
-                s(n, z, L),
-                (w = c(n, z, new i(f, p ? a.tokenize(N, p) : N, N))),
-                M && c(n, w, M),
-                L > 1)
-            ) {
-                var I = { cause: f + ',' + d, reach: W }
-                o(e, n, t, w.prev, A, I), g && I.reach > g.reach && (g.reach = I.reach)
-            }
+<script type="module">
+    import { createApp, ref, computed, watch, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
+
+    createApp({
+        setup() {
+            // API 基础URL
+            const API_BASE_URL = 'https://api.webhook.test';
+            
+            // 示例请求数据
+            const requests = ref([
+                {
+                    id: '540e3074-fba4-42d2-af0c-9067b9c2fce0',
+                    method: 'GET',
+                    path: '/webhook/540e3074-fba4-42d2-af0c-9067b9c2fce0',
+                    fullUrl: 'https://webhook.test/webhook/540e3074-fba4-42d2-af0c-9067b9c2fce0',
+                    timestamp: new Date().toISOString(),
+                    ip: '155.133.7.50',
+                    host: 'webhook.test',
+                    size: '0 bytes',
+                    processingTime: '0.000 sec',
+                    note: '',
+                    headers: {
+                        'accept-language': 'zh-CN,zh;q=0.9',
+                        'accept-encoding': 'gzip, deflate, br, zstd',
+                        'sec-fetch-dest': 'document',
+                        'sec-fetch-user': '?1',
+                        'sec-fetch-mode': 'navigate',
+                        'sec-fetch-site': 'none',
+                        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                        'purpose': 'prefetch',
+                        'sec-purpose': 'prefetch;prerender',
+                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+                        'upgrade-insecure-requests': '1',
+                        'sec-ch-ua-platform': '"Windows"',
+                        'sec-ch-ua-mobile': '?0',
+                        'sec-ch-ua': '"Google Chrome";v="135", "Not-A.Brand";v="8", "Chromium";v="135"',
+                        'host': 'webhook.site'
+                    },
+                    body: '',
+                    query: {},
+                    response: `This URL has no default content configured. = o.reach);
+    A += w.value.length, w = w.next
+) {
+    var E = w.value
+    if (n.length > e.length) return
+    if (!(E instanceof i)) {
+        var P,
+            L = 1
+        if (v) {
+            if (!(P = l(b, A, e, m)) || P.index >= e.length) break
+            var S = P.index,
+                Q = P.index + P[0].length,
+                j = A
+            for (j += w.value.length; S >= j; ) w.value instanceof i)) continue
+            for (var C = w; C !== n.tail && (j < Q || 'string' == typeof C.value); C = C.next)
+                L++, (j += C.value.length)
+            L--, (j -= C.value.length), (E = e.slice(A, j)), (P.index -= A)
+        } else if (!(P = l(b, 0, E, m))) continue
+        S = P.index
+        var N = P[0],
+            _ = E.slice(0, S),
+            M = E.slice(S + N.length),
+            W = A + E.length
+        g && W > g.reach && (g.reach = W)
+        var z = w.prev
+        if (
+            (_ && ((z = c(n, z, _)), (A += _.length)),
+            s(n, z, L),
+            (w = c(n, z, new i(f, p ? a.tokenize(N, p) : N, N))),
+            M && c(n, w, M),
+            L > 1)
+        ) {
+            var I = { cause: f + ',' + d, reach: W }
+            o(e, n, t, w.prev, A, I), g && I.reach > g.reach && (g.reach = I.reach)
         }
     }
 }
+}
 
 function s () {
-    var e = { value: null, prev: null, next: null },
-        n = { value: null, prev: e, next: null }
-    ;(e.next = n), (this.head = e), (this.tail = n), (this.length = 0)
+var e = { value: null, prev: null, next: null },
+    n = { value: null, prev: e, next: null }
+;(e.next = n), (this.head = e), (this.tail = n), (this.length = 0)
 }`
+                },
+                {
+                    id: 'abe9c8d4-b267-4490-a27e-becb2043c22b',
+                    method: 'POST',
+                    path: '/webhook/abc123',
+                    fullUrl: 'https://webhook.test/webhook/abc123',
+                    timestamp: new Date(Date.now() - 300000).toISOString(),
+                    ip: '192.168.1.1',
+                    host: 'webhook.test',
+                    size: '128 bytes',
+                    processingTime: '0.023 sec',
+                    note: '',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'Mozilla/5.0',
                     },
-                    {
-                        id: 'abe9c8d4-b267-4490-a27e-becb2043c22b',
-                        method: 'POST',
-                        path: '/webhook/abc123',
-                        fullUrl: 'https://webhook.test/webhook/abc123',
-                        timestamp: new Date(Date.now() - 300000).toISOString(),
-                        ip: '192.168.1.1',
-                        host: 'webhook.test',
-                        size: '128 bytes',
-                        processingTime: '0.023 sec',
-                        note: '',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'User-Agent': 'Mozilla/5.0',
-                        },
-                        body: JSON.stringify({ event: 'user.created', data: { id: 123, name: 'John Doe' } }, null, 2),
-                        query: {},
-                        response: 'OK'
-                    }
-                ]);
-
-                // 状态变量
-                const selectedRequestId = ref(requests.value[0].id);
-                const uniqueUrl = ref(generateUniqueUrl());
-                const copyButtonText = ref('复制');
-                const activeTab = ref('headers');
-                const noteText = ref('');
-                const isAddingNote = ref(false);
-                const showToast = ref(false);
-                const toastTitle = ref('');
-                const toastMessage = ref('');
-                const toastType = ref('success');
-                const bodyContentCopied = ref(false); // 新增：body内容复制状态
-
-                // 选项卡定义
-                const tabs = [
-                    { id: 'headers', name: 'Headers' },
-                    { id: 'body', name: 'Body' },
-                    { id: 'query', name: 'Query Params' },
-                    { id: 'response', name: 'Ok'  },
-                    { id: 'query', name: 'Query Params' },
-                    { id: 'response', name: 'Response' }
-                ];
-
-                // 计算属性
-                const selectedRequest = computed(() => {
-                    return requests.value.find(req => req.id === selectedRequestId.value) || null;
-                });
-
-                const hostLinks = computed(() => {
-                    if (!selectedRequest.value) return '';
-                    const ip = selectedRequest.value.ip;
-                    return `${ip} <a href="https://who.is/whois-ip/ip-address/${ip}" target="_blank">Whois</a> <a href="https://www.shodan.io/host/${ip}" target="_blank">Shodan</a> <a href="https://www.netify.ai/resources/ips/${ip}" target="_blank">Netify</a> <a href="https://search.censys.io/hosts/${ip}" target="_blank">Censys</a> <a href="https://www.virustotal.com/gui/ip-address/${ip}" target="_blank">VirusTotal</a>`;
-                });
-
-                const formattedResponse = computed(() => {
-                    if (!selectedRequest.value || !selectedRequest.value.response) return 'No response content';
-                    
-                    const response = selectedRequest.value.response;
-                    if (response.includes('\n')) {
-                        return response.split('\n').map(line => 
-                            `<span class="code-line">${escapeHtml(line)}</span>`
-                        ).join('');
-                    } else {
-                        return escapeHtml(response);
-                    }
-                });
-
-                const toastStyle = computed(() => {
-                    return {
-                        borderLeft: toastType.value === 'error' ? '4px solid #dc2626' : '4px solid #10b981'
-                    };
-                });
-
-                // 监听选中的请求变化
-                watch(selectedRequest, (newRequest) => {
-                    if (newRequest) {
-                        noteText.value = newRequest.note || '';
-                        bodyContentCopied.value = false; // 重置复制状态
-                    }
-                });
-
-                // 监听选项卡变化
-                watch(activeTab, () => {
-                    bodyContentCopied.value = false; // 切换选项卡时重置复制状态
-                });
-
-                // 方法
-                function generateUniqueUrl() {
-                    const randomId = Math.random().toString(36).substring(2, 10);
-                    return `https://webhook.test/webhook/${randomId}`;
+                    body: JSON.stringify({ event: 'user.created', data: { id: 123, name: 'John Doe' } }, null, 2),
+                    query: {},
+                    response: 'OK'
                 }
+            ]);
 
-                function formatDistanceToNow(date) {
-                    const now = new Date();
-                    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+            // 状态变量
+            const selectedRequestId = ref(requests.value[0].id);
+            const uniqueUrl = ref(generateUniqueUrl());
+            const copyButtonText = ref('复制');
+            const activeTab = ref('headers');
+            const noteText = ref('');
+            const isAddingNote = ref(false);
+            const showToast = ref(false);
+            const toastTitle = ref('');
+            const toastMessage = ref('');
+            const toastType = ref('success');
+            const bodyContentCopied = ref(false); // body内容复制状态
+            const jsonViewer = ref(null); // JSON查看器引用
 
-                    if (diffInSeconds < 60) {
-                        return `${diffInSeconds}秒前`;
-                    }
+            // 选项卡定义
+            const tabs = [
+                { id: 'headers', name: 'Headers' },
+                { id: 'body', name: 'Body' },
+                { id: 'query', name: 'Query Params' },
+                { id: 'response', name: 'Response' }
+            ];
 
-                    const diffInMinutes = Math.floor(diffInSeconds / 60);
-                    if (diffInMinutes < 60) {
-                        return `${diffInMinutes}分钟前`;
-                    }
+            // 计算属性
+            const selectedRequest = computed(() => {
+                return requests.value.find(req => req.id === selectedRequestId.value) || null;
+            });
 
-                    const diffInHours = Math.floor(diffInMinutes / 60);
-                    if (diffInHours < 24) {
-                        return `${diffInHours}小时前`;
-                    }
+            const hostLinks = computed(() => {
+                if (!selectedRequest.value) return '';
+                const ip = selectedRequest.value.ip;
+                return `${ip} <a href="https://who.is/whois-ip/ip-address/${ip}" target="_blank">Whois</a> <a href="https://www.shodan.io/host/${ip}" target="_blank">Shodan</a> <a href="https://www.netify.ai/resources/ips/${ip}" target="_blank">Netify</a> <a href="https://search.censys.io/hosts/${ip}" target="_blank">Censys</a> <a href="https://www.virustotal.com/gui/ip-address/${ip}" target="_blank">VirusTotal</a>`;
+            });
 
-                    const diffInDays = Math.floor(diffInHours / 24);
-                    return `${diffInDays}天前`;
+            const formattedResponse = computed(() => {
+                if (!selectedRequest.value || !selectedRequest.value.response) return 'No response content';
+                
+                const response = selectedRequest.value.response;
+                if (response.includes('\n')) {
+                    return response.split('\n').map(line => 
+                        `<span class="code-line">${escapeHtml(line)}</span>`
+                    ).join('');
+                } else {
+                    return escapeHtml(response);
                 }
+            });
 
-                function formatDate(date) {
-                    return date.toLocaleString('zh-CN', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    });
-                }
-
-                function copyUrl() {
-                    navigator.clipboard.writeText(uniqueUrl.value).then(() => {
-                        copyButtonText.value = '已复制';
-                        displayToast('已复制到剪贴板', 'URL已成功复制到剪贴板');
-                        setTimeout(() => {
-                            copyButtonText.value = '复制';
-                        }, 2000);
-                    }).catch(() => {
-                        displayToast('复制失败', '无法复制到剪贴板', 'error');
-                    });
-                }
-
-                // 新增：复制body内容
-                function copyBodyContent() {
-                    if (!selectedRequest.value) return;
-                    
-                    const bodyContent = selectedRequest.value.body || '';
-                    navigator.clipboard.writeText(bodyContent).then(() => {
-                        bodyContentCopied.value = true;
-                        displayToast('已复制到剪贴板', 'Body内容已成功复制到剪贴板');
-                        setTimeout(() => {
-                            bodyContentCopied.value = false;
-                        }, 2000);
-                    }).catch(() => {
-                        displayToast('复制失败', '无法复制到剪贴板', 'error');
-                    });
-                }
-
-                function selectRequest(id) {
-                    selectedRequestId.value = id;
-                }
-
-                async function addNote() {
-                    if (!noteText.value.trim() || !selectedRequestId.value) return;
-                    
-                    isAddingNote.value = true;
-                    
-                    try {
-                        // 模拟API请求
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // 更新本地数据
-                        const request = requests.value.find(req => req.id === selectedRequestId.value);
-                        if (request) {
-                            request.note = noteText.value;
-                            displayToast('备注已添加', '您的备注已成功保存');
-                        }
-                    } catch (error) {
-                        displayToast('添加备注失败', '无法保存备注，请稍后重试', 'error');
-                    } finally {
-                        isAddingNote.value = false;
-                    }
-                }
-
-                function deleteRequest(id) {
-                    if (confirm('确定要删除此请求吗？此操作无法撤销。')) {
-                        deleteRequestWithAPI(id);
-                    }
-                }
-
-                async function deleteRequestWithAPI(id) {
-                    try {
-                        // 模拟API请求
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // 从数组中删除请求
-                        const index = requests.value.findIndex(req => req.id === id);
-                        if (index !== -1) {
-                            requests.value.splice(index, 1);
-                            
-                            // 如果删除的是当前选中的请求，则选择列表中的第一个请求
-                            if (id === selectedRequestId.value) {
-                                if (requests.value.length > 0) {
-                                    selectedRequestId.value = requests.value[0].id;
-                                } else {
-                                    selectedRequestId.value = null;
-                                }
-                            }
-                            
-                            displayToast('请求已删除', `ID为 ${id} 的请求已被删除`);
-                        }
-                    } catch (error) {
-                        displayToast('删除失败', '无法删除请求，请稍后重试', 'error');
-                    }
-                }
-
-                function getTabContent(tabId) {
-                    if (!selectedRequest.value) return '';
-                    
-                    switch (tabId) {
-                        case 'headers':
-                            return Object.entries(selectedRequest.value.headers)
-                                .map(([key, value]) => `${key}: ${value}`)
-                                .join('\n') || 'No headers';
-                        case 'body':
-                            return selectedRequest.value.body || 'No body content';
-                        case 'query':
-                            return Object.entries(selectedRequest.value.query)
-                                .map(([key, value]) => `${key}: ${value}`)
-                                .join('\n') || 'No query parameters';
-                        default:
-                            return '';
-                    }
-                }
-
-                function displayToast(title, message, type = 'success') {
-                    toastTitle.value = title;
-                    toastMessage.value = message;
-                    toastType.value = type;
-                    showToast.value = true;
-                    
-                    setTimeout(() => {
-                        showToast.value = false;
-                    }, 3000);
-                }
-
-                function simulateNewRequest() {
-                    // 随机选择请求方法
-                    const methods = ['GET', 'POST', 'PUT', 'DELETE'];
-                    const randomMethod = methods[Math.floor(Math.random() * methods.length)];
-                    
-                    // 创建随机请求体
-                    let randomBody = '';
-                    if (randomMethod !== 'GET') {
-                        const randomData = {
-                            event: ['user.created', 'user.updated', 'payment.received', 'order.created'][Math.floor(Math.random() * 4)],
-                            timestamp: new Date().toISOString(),
-                            data: {
-                                id: Math.floor(Math.random() * 10000),
-                                name: ['John Doe', 'Jane Smith', 'Alex Johnson', 'Sarah Williams'][Math.floor(Math.random() * 4)]
-                            }
-                        };
-                        randomBody = JSON.stringify(randomData, null, 2);
-                    }
-                    
-                    // 生成唯一ID
-                    const requestId = 'req-' + Math.random().toString(36).substring(2, 15);
-                    
-                    // 创建新请求对象
-                    const newRequest = {
-                        id: requestId,
-                        method: randomMethod,
-                        path: '/webhook/' + uniqueUrl.value.split('/').pop(),
-                        fullUrl: uniqueUrl.value,
-                        timestamp: new Date().toISOString(),
-                        ip: generateRandomIp(),
-                        host: 'webhook.test',
-                        size: Math.floor(Math.random() * 1000) + ' bytes',
-                        processingTime: (Math.random() * 0.5).toFixed(3) + ' sec',
-                        note: '',
-                        headers: {
-                            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-                            'content-type': randomMethod !== 'GET' ? 'application/json' : '',
-                            'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
-                            'accept-encoding': 'gzip, deflate, br, zstd',
-                            'x-request-id': Math.random().toString(36).substring(2, 15)
-                        },
-                        body: randomBody,
-                        query: {},
-                        response: 'OK'
-                    };
-                    
-                    // 将新请求添加到数组开头
-                    requests.value.unshift(newRequest);
-                    
-                    // 限制请求列表最大长度，避免性能问题
-                    if (requests.value.length > 50) {
-                        requests.value.pop();
-                    }
-                    
-                    // 选择并显示新请求
-                    selectedRequestId.value = newRequest.id;
-                    
-                    // 显示通知
-                    displayToast('新请求已接收', `收到一个新的 ${newRequest.method} 请求`);
-                }
-
-                function generateRandomIp() {
-                    return `${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
-                }
-
-                function escapeHtml(unsafe) {
-                    return unsafe
-                        .replace(/&/g, "&amp;")
-                        .replace(/</g, "&lt;")
-                        .replace(/>/g, "&gt;")
-                        .replace(/"/g, "&quot;")
-                        .replace(/'/g, "&#039;");
-                }
-
-                // 返回数据和方法
+            const toastStyle = computed(() => {
                 return {
-                    requests,
-                    selectedRequestId,
-                    selectedRequest,
-                    uniqueUrl,
-                    copyButtonText,
-                    activeTab,
-                    tabs,
-                    noteText,
-                    isAddingNote,
-                    showToast,
-                    toastTitle,
-                    toastMessage,
-                    toastStyle,
-                    hostLinks,
-                    formattedResponse,
-                    bodyContentCopied, // 新增：body内容复制状态
-                    
-                    formatDistanceToNow,
-                    formatDate,
-                    copyUrl,
-                    selectRequest,
-                    addNote,
-                    deleteRequest,
-                    getTabContent,
-                    simulateNewRequest,
-                    copyBodyContent // 新增：复制body内容方法
+                    borderLeft: toastType.value === 'error' ? '4px solid #dc2626' : '4px solid #10b981'
                 };
+            });
+
+            // 检查body是否为JSON格式
+            const isJsonBody = computed(() => {
+                if (!selectedRequest.value || !selectedRequest.value.body) return false;
+                
+                try {
+                    const body = selectedRequest.value.body.trim();
+                    if ((body.startsWith('{') && body.endsWith('}')) || 
+                        (body.startsWith('[') && body.endsWith(']'))) {
+                        JSON.parse(body);
+                        return true;
+                    }
+                    return false;
+                } catch (e) {
+                    return false;
+                }
+            });
+
+            // 监听选中的请求变化
+            watch(selectedRequest, (newRequest) => {
+                if (newRequest) {
+                    noteText.value = newRequest.note || '';
+                    bodyContentCopied.value = false; // 重置复制状态
+                    
+                    // 当请求变化时，如果当前是body选项卡且是JSON，则应用高亮
+                    if (activeTab.value === 'body' && isJsonBody.value) {
+                        nextTick(() => {
+                            applyJsonHighlight();
+                        });
+                    }
+                }
+            });
+
+            // 监听选项卡变化
+            watch(activeTab, (newTab) => {
+                bodyContentCopied.value = false; // 切换选项卡时重置复制状态
+                
+                // 当切换到body选项卡且是JSON时，应用高亮
+                if (newTab === 'body' && isJsonBody.value) {
+                    nextTick(() => {
+                        applyJsonHighlight();
+                    });
+                }
+            });
+
+            // 应用JSON高亮
+            function applyJsonHighlight() {
+                if (!selectedRequest.value || !jsonViewer.value) return;
+                
+                try {
+                    const bodyContent = selectedRequest.value.body;
+                    if (!bodyContent) return;
+                    
+                    // 创建pre和code元素
+                    const pre = document.createElement('pre');
+                    const code = document.createElement('code');
+                    code.className = 'language-json';
+                    code.textContent = bodyContent;
+                    pre.appendChild(code);
+                    
+                    // 清空容器并添加新元素
+                    jsonViewer.value.innerHTML = '';
+                    jsonViewer.value.appendChild(pre);
+                    
+                    // 应用高亮
+                    hljs.highlightElement(code);
+                } catch (e) {
+                    console.error('JSON高亮显示失败:', e);
+                }
             }
-        }).mount('#app');
-    </script>
+
+            // 方法
+            function generateUniqueUrl() {
+                const randomId = Math.random().toString(36).substring(2, 10);
+                return `https://webhook.test/webhook/${randomId}`;
+            }
+
+            function formatDistanceToNow(date) {
+                const now = new Date();
+                const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+                if (diffInSeconds < 60) {
+                    return `${diffInSeconds}秒前`;
+                }
+
+                const diffInMinutes = Math.floor(diffInSeconds / 60);
+                if (diffInMinutes < 60) {
+                    return `${diffInMinutes}分钟前`;
+                }
+
+                const diffInHours = Math.floor(diffInMinutes / 60);
+                if (diffInHours < 24) {
+                    return `${diffInHours}小时前`;
+                }
+
+                const diffInDays = Math.floor(diffInHours / 24);
+                return `${diffInDays}天前`;
+            }
+
+            function formatDate(date) {
+                return date.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            }
+
+            function copyUrl() {
+                navigator.clipboard.writeText(uniqueUrl.value).then(() => {
+                    copyButtonText.value = '已复制';
+                    displayToast('已复制到剪贴板', 'URL已成功复制到剪贴板');
+                    setTimeout(() => {
+                        copyButtonText.value = '复制';
+                    }, 2000);
+                }).catch(() => {
+                    displayToast('复制失败', '无法复制到剪贴板', 'error');
+                });
+            }
+
+            // 复制body内容
+            function copyBodyContent() {
+                if (!selectedRequest.value) return;
+                
+                const bodyContent = selectedRequest.value.body || '';
+                navigator.clipboard.writeText(bodyContent).then(() => {
+                    bodyContentCopied.value = true;
+                    displayToast('已复制到剪贴板', 'Body内容已成功复制到剪贴板');
+                    setTimeout(() => {
+                        bodyContentCopied.value = false;
+                    }, 2000);
+                }).catch(() => {
+                    displayToast('复制失败', '无法复制到剪贴板', 'error');
+                });
+            }
+
+            function selectRequest(id) {
+                selectedRequestId.value = id;
+            }
+
+            async function addNote() {
+                if (!noteText.value.trim() || !selectedRequestId.value) return;
+                
+                isAddingNote.value = true;
+                
+                try {
+                    // 模拟API请求
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // 更新本地数据
+                    const request = requests.value.find(req => req.id === selectedRequestId.value);
+                    if (request) {
+                        request.note = noteText.value;
+                        displayToast('备注已添加', '您的备注已成功保存');
+                    }
+                } catch (error) {
+                    displayToast('添加备注失败', '无法保存备注，请稍后重试', 'error');
+                } finally {
+                    isAddingNote.value = false;
+                }
+            }
+
+            function deleteRequest(id) {
+                if (confirm('确定要删除此请求吗？此操作无法撤销。')) {
+                    deleteRequestWithAPI(id);
+                }
+            }
+
+            async function deleteRequestWithAPI(id) {
+                try {
+                    // 模拟API请求
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // 从数组中删除请求
+                    const index = requests.value.findIndex(req => req.id === id);
+                    if (index !== -1) {
+                        requests.value.splice(index, 1);
+                        
+                        // 如果删除的是当前选中的请求，则选择列表中的第一个请求
+                        if (id === selectedRequestId.value) {
+                            if (requests.value.length > 0) {
+                                selectedRequestId.value = requests.value[0].id;
+                            } else {
+                                selectedRequestId.value = null;
+                            }
+                        }
+                        
+                        displayToast('请求已删除', `ID为 ${id} 的请求已被删除`);
+                    }
+                } catch (error) {
+                    displayToast('删除失败', '无法删除请求，请稍后重试', 'error');
+                }
+            }
+
+            function getTabContent(tabId) {
+                if (!selectedRequest.value) return '';
+                
+                switch (tabId) {
+                    case 'headers':
+                        return Object.entries(selectedRequest.value.headers)
+                            .map(([key, value]) => `${key}: ${value}`)
+                            .join('\n') || 'No headers';
+                    case 'body':
+                        return selectedRequest.value.body || 'No body content';
+                    case 'query':
+                        return Object.entries(selectedRequest.value.query)
+                            .map(([key, value]) => `${key}: ${value}`)
+                            .join('\n') || 'No query parameters';
+                    default:
+                        return '';
+                }
+            }
+
+            function displayToast(title, message, type = 'success') {
+                toastTitle.value = title;
+                toastMessage.value = message;
+                toastType.value = type;
+                showToast.value = true;
+                
+                setTimeout(() => {
+                    showToast.value = false;
+                }, 3000);
+            }
+
+            function simulateNewRequest() {
+                // 随机选择请求方法
+                const methods = ['GET', 'POST', 'PUT', 'DELETE'];
+                const randomMethod = methods[Math.floor(Math.random() * methods.length)];
+                
+                // 创建随机请求体
+                let randomBody = '';
+                if (randomMethod !== 'GET') {
+                    const randomData = {
+                        event: ['user.created', 'user.updated', 'payment.received', 'order.created'][Math.floor(Math.random() * 4)],
+                        timestamp: new Date().toISOString(),
+                        data: {
+                            id: Math.floor(Math.random() * 10000),
+                            name: ['John Doe', 'Jane Smith', 'Alex Johnson', 'Sarah Williams'][Math.floor(Math.random() * 4)]
+                        }
+                    };
+                    randomBody = JSON.stringify(randomData, null, 2);
+                }
+                
+                // 生成唯一ID
+                const requestId = 'req-' + Math.random().toString(36).substring(2, 15);
+                
+                // 创建新请求对象
+                const newRequest = {
+                    id: requestId,
+                    method: randomMethod,
+                    path: '/webhook/' + uniqueUrl.value.split('/').pop(),
+                    fullUrl: uniqueUrl.value,
+                    timestamp: new Date().toISOString(),
+                    ip: generateRandomIp(),
+                    host: 'webhook.test',
+                    size: Math.floor(Math.random() * 1000) + ' bytes',
+                    processingTime: (Math.random() * 0.5).toFixed(3) + ' sec',
+                    note: '',
+                    headers: {
+                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+                        'content-type': randomMethod !== 'GET' ? 'application/json' : '',
+                        'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                        'accept-encoding': 'gzip, deflate, br, zstd',
+                        'x-request-id': Math.random().toString(36).substring(2, 15)
+                    },
+                    body: randomBody,
+                    query: {},
+                    response: 'OK'
+                };
+                
+                // 将新请求添加到数组开头
+                requests.value.unshift(newRequest);
+                
+                // 限制请求列表最大长度，避免性能问题
+                if (requests.value.length > 50) {
+                    requests.value.pop();
+                }
+                
+                // 选择并显示新请求
+                selectedRequestId.value = newRequest.id;
+                
+                // 显示通知
+                displayToast('新请求已接收', `收到一个新的 ${newRequest.method} 请求`);
+            }
+
+            function generateRandomIp() {
+                return `${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
+            }
+
+            function escapeHtml(unsafe) {
+                return unsafe
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            // 返回数据和方法
+            return {
+                requests,
+                selectedRequestId,
+                selectedRequest,
+                uniqueUrl,
+                copyButtonText,
+                activeTab,
+                tabs,
+                noteText,
+                isAddingNote,
+                showToast,
+                toastTitle,
+                toastMessage,
+                toastStyle,
+                hostLinks,
+                formattedResponse,
+                bodyContentCopied,
+                isJsonBody,
+                jsonViewer,
+                
+                formatDistanceToNow,
+                formatDate,
+                copyUrl,
+                selectRequest,
+                addNote,
+                deleteRequest,
+                getTabContent,
+                simulateNewRequest,
+                copyBodyContent
+            };
+        }
+    }).mount('#app');
+</script>
 </body>
 </html>
